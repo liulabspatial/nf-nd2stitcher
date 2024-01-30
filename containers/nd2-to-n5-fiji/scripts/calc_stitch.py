@@ -80,9 +80,9 @@ def main():
     print(macro_dir)
 
 
-    ijargs2 = "select=" + input + " process_angle=[All angles] process_channel=[All channels] process_illumination=[All illuminations] process_tile=[All tiles] process_timepoint=[All Timepoints] method=[Phase Correlation] downsample_in_x=2 downsample_in_y=2 downsample_in_z=1"
+    ijargs2 = "select=" + input + " process_angle=[All angles] process_channel=[All channels] process_illumination=[All illuminations] process_tile=[All tiles] process_timepoint=[All Timepoints] method=[Phase Correlation] downsample_in_x=4 downsample_in_y=4 downsample_in_z=2"
     ijargs2 += ";"
-    ijargs2 += "select=" + input + " filter_by_link_quality min_r=0.1 max_r=1 filter_by_shift_in_each_dimension max_shift_in_x=100 max_shift_in_y=100 max_shift_in_z=100 max_displacement=0"
+    ijargs2 += "select=" + input + " filter_by_link_quality min_r=0.3 max_r=1 filter_by_shift_in_each_dimension max_shift_in_x=100 max_shift_in_y=100 max_shift_in_z=100 max_displacement=0"
     ijargs2 += ";"
     ijargs2 += "select=" + input + " process_angle=[All angles] process_channel=[All channels] process_illumination=[All illuminations] process_tile=[All tiles] process_timepoint=[All Timepoints] relative=2.500 absolute=3.500 global_optimization_strategy=[Two-Round using Metadata to align unconnected Tiles and iterative dropping of bad links] fix_group_0-0"
     ijargs2 += ";"

@@ -363,7 +363,6 @@ workflow {
     result2 = myDir2.mkdir()
     println result2 ? "Created $myDir2" : "Cannot create directory: $myDir2"
 
-    bg = Channel.fromPath(bgpath).first()
     nd2 = Channel.fromPath(infile)
     base_name = file(infile).getBaseName()
     nd2.subscribe { println "nd2: $it" }

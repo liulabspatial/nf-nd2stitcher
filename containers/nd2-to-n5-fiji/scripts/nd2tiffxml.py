@@ -44,7 +44,7 @@ def main():
     outlist = []
 
     for i in range(0, len(input)):
-        for t in range(0, 100):
+        for t in range(0, 100): #TODO: Get channel number from an input xml.
             dataname = os.path.basename(output[0])
             outdirpath = os.path.dirname(output[0])
             stem = os.path.splitext(dataname)[0]
