@@ -11,10 +11,14 @@ WORKDIR /tmp/app
 #RUN git clone --branch ${BIGSTITCHER_SPARK_GIT_TAG} --depth 1 https://github.com/JaneliaSciComp/BigStitcher-Spark.git . \
 #    && /usr/local/bin/buildinfo.sh \
 #    && xq -r '.project.artifactId+"-"+.project.version+".jar"' pom.xml > filename
-RUN git init \
-    && git remote add origin https://github.com/JaneliaSciComp/BigStitcher-Spark.git \
-    && git fetch --depth 1 origin 17f52a6f1430c9a98e965c66465172560134a872 \
-    && git reset --hard FETCH_HEAD \
+#RUN git init \
+#    && git remote add origin https://github.com/takashi310/BigStitcher-Spark.git \
+#    && git fetch --depth 1 origin 17f52a6f1430c9a98e965c66465172560134a872 \
+#    && git reset --hard FETCH_HEAD \
+#    && /usr/local/bin/buildinfo.sh \
+#    && xq -r '.project.artifactId+"-"+.project.version+".jar"' pom.xml > filename
+
+RUN git clone --branch main --depth 1 https://github.com/takashi310/BigStitcher-Spark.git . \
     && /usr/local/bin/buildinfo.sh \
     && xq -r '.project.artifactId+"-"+.project.version+".jar"' pom.xml > filename
 

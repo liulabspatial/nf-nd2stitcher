@@ -30,8 +30,8 @@ params.mem_gb = params.cpus * 14
 
 params.spark_local_dir = null
 params.spark_cluster = true
-params.spark_workers = 10
-params.spark_worker_cores = 20
+params.spark_workers = 4
+params.spark_worker_cores = 16
 params.spark_gb_per_core = 14
 params.spark_driver_cores = 1
 params.spark_driver_memory = '12 GB'
@@ -121,7 +121,7 @@ process calc_stitching {
     script:
     inxml = meta.resave_outxml
     """
-    /entrypoint.sh calc_stitch -i $inxml -m ${params.mem_gb}G  > /dev/null 2>&1
+    /entrypoint.sh calc_stitch -i $inxml -m ${params.mem_gb}G -t ${params.cpus} -d 8,8,4 -r 0.3  > /dev/null 2>&1
     """
 }
 
@@ -230,7 +230,7 @@ process SPARK_RESAVE {
 
 process SPARK_DOWNSAMPLE {
     tag "${meta.id}"
-    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.3'
+    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.4'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
@@ -268,7 +268,7 @@ process SPARK_DOWNSAMPLE {
 
 process SPARK_FUSION {
     tag "${meta.id}"
-    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.3'
+    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.4'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
@@ -299,7 +299,7 @@ process SPARK_FUSION {
         /opt/scripts/runapp.sh "$workflow.containerEngine" "$spark.work_dir" "$spark.uri" \
             /app/app.jar net.preibisch.bigstitcher.spark.AffineFusion \
             $spark.parallelism $spark.worker_cores "$executor_memory" $spark.driver_cores "$driver_memory" \
-            --bdv 0,\$i --channelId \$i -x ${inxml} -xo ${outxml} -o ${n5dir} --blockSize ${params.blockSize} --UINT16 --minIntensity 0.0 --maxIntensity 65535.0
+            --bdv 0,\$i --channelId \$i -x ${inxml} -xo ${outxml} -o ${n5dir} --blockSize ${params.blockSize} --UINT16 --minIntensity 0.0 --maxIntensity 65535.0 --downsampling "1,1,1;2,2,2;4,4,4;8,8,8;16,16,16"
     done
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -479,8 +479,6 @@ workflow {
             meta.fusion_inxml = meta.indir + "/" + meta.id + ".xml"
             meta.fusion_outxml = meta.tmpdir + "/" + file(xml).baseName + "_fused.xml"
             meta.fusion_n5dir = meta.tmpdir + "/" + file(xml).baseName + "_fused.n5"
-            meta.ds_outxml = meta.tmpdir + "/" + file(xml).baseName + "_ds.xml"
-            meta.ds_n5dir = meta.tmpdir + "/" + file(xml).baseName + "_ds.n5"
             [meta, xml]
         }.set { ch_acquisitions2 }
 
@@ -501,11 +499,10 @@ workflow {
         )
 
         SPARK_FUSION(SPARK_START2.out)
-        SPARK_DOWNSAMPLE(SPARK_FUSION.out.acquisitions)
 
-        done = SPARK_STOP2(SPARK_DOWNSAMPLE.out.acquisitions)
+        done = SPARK_STOP2(SPARK_FUSION.out.acquisitions)
 
-        param5 = SPARK_DOWNSAMPLE.out.acquisitions.map{ tuple("${it[0].ds_outxml}", "${outdir}/easi") }
+        param5 = SPARK_FUSION.out.acquisitions.map{ tuple("${it[0].fusion_outxml}", "${outdir}/easi") }
         fix_res(param5, SPARK_STOP2.out.collect())
 
         tmpdir_ch = Channel.fromPath(tmpdir)
