@@ -230,7 +230,7 @@ process SPARK_RESAVE {
 
 process SPARK_DOWNSAMPLE {
     tag "${meta.id}"
-    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.4'
+    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.5'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
@@ -268,7 +268,7 @@ process SPARK_DOWNSAMPLE {
 
 process SPARK_FUSION {
     tag "${meta.id}"
-    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.4'
+    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.5'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }

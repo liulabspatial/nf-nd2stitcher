@@ -9,6 +9,7 @@ usage() {
 	echo "  -o, --outdir    	path to an output directory"
 	echo "  -b, --bg		    path to a background image for background subtraction"
 	echo "  -d, --dapi		    channel id of a dapi channel."
+	echo "  -m, --model			path to a cell pose model"
     echo "  -t, --thread    	number of threads for non-spark processes"
     echo "  -w, --worker    	number of workers for spark processes"
     echo "  -c, --core    	    number of cores per worker for spark processes"
@@ -21,6 +22,7 @@ usage() {
 }
 
 DAPI=0
+MODEL="/nrs/scicompsoft/kawaset/Liu/ESCell60X"
 
 for OPT in "$@"
 do
@@ -59,6 +61,14 @@ do
 				exit 1
 			fi
 			DAPI="$2"
+			shift 2
+			;;
+		'-m'|'--model' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
+				echo "$PROGNAME: option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			MODEL="$2"
 			shift 2
 			;;
         '-t'|'--thread' )
@@ -189,7 +199,7 @@ for (( i=0; i<NUM_TIMEPOINTS; i++ )); do
         --measure_intensities_memory '700 G' \
         --assign_spots_cpus 48 \
         --assign_spots_memory '700 G' \
-        --segmentation_model_dir \"/nrs/scicompsoft/kawaset/Liu/ESCell60X\" \"$@\""
+        --segmentation_model_dir \"$MODEL\" \"$@\""
 
 	if [ $i == 0 ]; then
     	SKIP="stitching,spot_extraction,warp_spots,measure_intensities,assign_spots"
@@ -198,8 +208,8 @@ for (( i=0; i<NUM_TIMEPOINTS; i++ )); do
 	else
     	SKIP="stitching,segmentation"
 		RSFISH_CLUSTER_SETTINGS="$RSWORKERNUM $RSCORENUM --rsfish_gb_per_core 15"
-		#bsub -n 1 -W 24:00 -o $OUTDIR/mulifish_log_t$i.txt -P scicompsoft "./main.nf -c $MULTIFISHDIR/nextflow_no_nv.config $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
-		eval "nextflow run ./main.nf -c $MULTIFISHDIR/nextflow_no_nv.config $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
+		bsub -n 1 -W 24:00 -o $OUTDIR/mulifish_log_t$i.txt -P scicompsoft "./main.nf -c $MULTIFISHDIR/nextflow_no_nv.config $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
+		#eval "nextflow run ./main.nf -c $MULTIFISHDIR/nextflow_no_nv.config $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
 	fi
 	
 	
