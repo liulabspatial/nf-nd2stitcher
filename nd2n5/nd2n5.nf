@@ -16,6 +16,8 @@ params.prestitch = false
 
 params.fusionOnly = false
 
+params.oneTileWins = false
+
 // path to the output dataset
 params.outputDataset = "/s0"
 
@@ -48,6 +50,8 @@ include { STITCHING_PREPARE } from './reusables'
 include { STITCHING_PREPARE as STITCHING_PREPARE2 } from './reusables'
 
 process define_dataset {
+    scratch true
+
     container 'registry.int.janelia.org/liulab/nd2-to-n5-fiji:0.0.1'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
 
@@ -86,6 +90,8 @@ process fix_n5xml {
 }
 
 process calc_stitching_resume {
+    scratch true
+
     container 'registry.int.janelia.org/liulab/nd2-to-n5-fiji:0.0.1'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
 
@@ -105,6 +111,8 @@ process calc_stitching_resume {
 }
 
 process calc_stitching {
+    scratch true
+
     container 'registry.int.janelia.org/liulab/nd2-to-n5-fiji:0.0.1'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
 
@@ -126,6 +134,8 @@ process calc_stitching {
 }
 
 process gen_csv {
+    scratch true
+
     container 'registry.int.janelia.org/liulab/nd2-to-n5-py:0.0.3'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
 
@@ -145,6 +155,8 @@ process gen_csv {
 }
 
 process split_xml {
+    scratch true
+
     container 'registry.int.janelia.org/liulab/nd2-to-n5-py:0.0.3'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
 
@@ -165,6 +177,8 @@ process split_xml {
 }
 
 process nd2tiff {
+    scratch true
+
     container 'registry.int.janelia.org/liulab/nd2-to-n5-py:0.0.3'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
 
@@ -184,6 +198,8 @@ process nd2tiff {
 }
 
 process SPARK_RESAVE {
+    scratch true
+
     tag "${meta.id}"
     container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.3'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
@@ -229,8 +245,10 @@ process SPARK_RESAVE {
 }
 
 process SPARK_DOWNSAMPLE {
+    scratch true
+
     tag "${meta.id}"
-    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.5'
+    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.6'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
@@ -267,8 +285,10 @@ process SPARK_DOWNSAMPLE {
 }
 
 process SPARK_FUSION {
+    scratch true
+
     tag "${meta.id}"
-    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.5'
+    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.6'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
@@ -290,6 +310,7 @@ process SPARK_FUSION {
     inxml = meta.fusion_inxml
     outxml = meta.fusion_outxml
     n5dir = meta.fusion_n5dir
+    oneTileWins = params.oneTileWins ? '--oneTileWins' : ''
 
     parsed_xml = new XmlSlurper().parse("$inxml")
     maxChannelId = parsed_xml.'**'.findAll{ it.name() == 'Channel' }.size() - 1
@@ -299,7 +320,7 @@ process SPARK_FUSION {
         /opt/scripts/runapp.sh "$workflow.containerEngine" "$spark.work_dir" "$spark.uri" \
             /app/app.jar net.preibisch.bigstitcher.spark.AffineFusion \
             $spark.parallelism $spark.worker_cores "$executor_memory" $spark.driver_cores "$driver_memory" \
-            --bdv 0,\$i --channelId \$i -x ${inxml} -xo ${outxml} -o ${n5dir} --blockSize ${params.blockSize} --UINT16 --minIntensity 0.0 --maxIntensity 65535.0 --downsampling "1,1,1;2,2,2;4,4,4;8,8,8;16,16,16"
+            --bdv 0,\$i --channelId \$i -x ${inxml} -xo ${outxml} -o ${n5dir} --blockSize ${params.blockSize} ${oneTileWins} --UINT16 --minIntensity 0.0 --maxIntensity 65535.0 --downsampling "1,1,1;2,2,2;4,4,4;8,8,8;16,16,16"
     done
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -310,6 +331,8 @@ process SPARK_FUSION {
 }
 
 process fix_res {
+    scratch true
+
     container 'registry.int.janelia.org/liulab/nd2-to-n5-py:0.0.3'
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
 
@@ -330,6 +353,8 @@ process fix_res {
 }
 
 process remove_dir {
+    scratch true
+
     containerOptions { getOptions([params.inputPath, params.outputPath]) }
 
     memory { "16 GB" }

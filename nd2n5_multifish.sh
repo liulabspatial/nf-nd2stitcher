@@ -15,6 +15,7 @@ usage() {
     echo "  -c, --core    	    number of cores per worker for spark processes"
     echo "  -p, --prestitch	    do not perform image fusion"
     echo "  -f, --fusionOnly	perform only image fusion"
+	echo "  --oneTileWins		use the one-tile-wins strategy for stitching"
     echo "  -r, --resume    	resume a workflow execution"
 	echo "  -h, --help		    display this help and exit"
 	echo "example: ./warpswc.sh -c /opt/local/lib/cmtk/bin -s JFRC2010_20x -t JFRC2013_20x input.swc > output.swc"
@@ -107,6 +108,10 @@ do
 			FUSIONONLY="--fusionOnly"
 			shift 1
 			;;
+		'--oneTileWins' )
+			ONETILEWINS="--oneTileWins"
+			shift 1
+			;;
         '-r'|'--resume' )
 			RESUME="-resume"
 			shift 1
@@ -133,11 +138,21 @@ done
 INPUTDIR=$(dirname "$INPUTND2")
 BGDIR=$(dirname "$BGIMG")
 
+NXFTMPDIR="$OUTDIR/nextflow_temp"
+if [ ! -d "$NXFTMPDIR" ]; then
+    mkdir -p "$NXFTMPDIR"
+    echo "Directory created: $NXFTMPDIR"
+else
+    echo "Directory already exists: $NXFTMPDIR"
+fi
+
+export TMPDIR="$NXFTMPDIR"
+export NXF_TEMP="$NXFTMPDIR"
 export PATH="/groups/scicompsoft/scicompsoft/kawaset_temp:$PATH"
 export NXF_JAVA_HOME="/groups/scicompsoft/scicompsoft/kawaset_temp/tools/jdk-17" 
 cd /groups/scicompsoft/scicompsoft/kawaset_temp/nd2n5
 
-nextflow run ./nd2n5/nd2n5.nf -profile lsf $RESUME --runtime_opts "-B $INPUTDIR -B $BGDIR -B /scratch" --inputPath "$INPUTND2" --outputPath "$OUTDIR" --bgimg "$BGIMG" $PRESTITCH $FUSIONONLY $THREADNUM $WORKERNUM $CORENUM
+nextflow run ./nd2n5/nd2n5.nf -profile lsf $RESUME --runtime_opts "--env TMPDIR=$NXFTMPDIR -B $INPUTDIR -B $BGDIR -B /scratch" --inputPath "$INPUTND2" --outputPath "$OUTDIR" --bgimg "$BGIMG" $PRESTITCH $FUSIONONLY $ONETILEWINS $THREADNUM $WORKERNUM $CORENUM
 
 SEARCH_DIR="$OUTDIR/easi"
 NUM_TIMEPOINTS=$(($(find "$SEARCH_DIR" -maxdepth 1 -type d | wc -l) - 1))
@@ -170,15 +185,13 @@ for (( i=0; i<NUM_TIMEPOINTS; i++ )); do
 
 	COMMON_PARAMS="-dump-channels \
         -profile lsf \
-        --runtime_opts \"--env ITK_THREADS=32 -B /nrs/scicompsoft/kawaset/Liu -B $INPUTDIR -B $BGDIR -B $OUTDIR -B /scratch\" \
+        --runtime_opts \"--env TMPDIR=$NXFTMPDIR --env ITK_THREADS=32 -B /nrs/scicompsoft/kawaset/Liu -B $INPUTDIR -B $BGDIR -B $OUTDIR -B /scratch\" \
         --lsf_opts \"-P scicompsoft\" \
         $MFWORKERNUM \
         $MFCORENUM \
         --spark_work_dir \"$PWD/local\" \
         --data_dir \"$OUTDIR\" \
         --output_dir \"$OUTDIR/easi\" \
-        --stitch_acq_names \"dataset-t$i\" \
-        --spot_extraction_acq_names \"dataset-t$i\" \
         --acq_names \"dataset-t$i\" \
         --ref_acq \"dataset-t0\" \
         --channels \"$CH_NAMES\" \
