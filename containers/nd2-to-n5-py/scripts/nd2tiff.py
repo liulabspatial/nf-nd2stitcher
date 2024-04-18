@@ -99,24 +99,29 @@ def nd2tiff():
     h = darray.shape[y_idx]
     w = darray.shape[x_idx]
 
-    bg_array = tifffile.imread(bg, is_shaped=False)
-
     output = np.zeros((d, h, w), dtype=darray.dtype)
     if timepoints_idx >= 0:
-        if channels_idx >= 0:
-            output[:d, :h, :w] = darray[time_id, tile_id, :d, ch_id, :h, :w]
+        if tiles_idx >= 0:
+            if channels_idx >= 0:
+                output[:d, :h, :w] = darray[time_id, tile_id, :d, ch_id, :h, :w]
+            else:
+                output[:d, :h, :w] = darray[time_id, tile_id, :d, :h, :w]
         else:
-            output[:d, :h, :w] = darray[time_id, tile_id, :d, :h, :w]
+            if channels_idx >= 0:
+                output[:d, :h, :w] = darray[time_id, :d, ch_id, :h, :w]
+            else:
+                output[:d, :h, :w] = darray[time_id, :d, :h, :w]
     else:
-        if channels_idx >= 0:
-            output[:d, :h, :w] = darray[tile_id, :d, ch_id, :h, :w]
+        if tiles_idx >= 0:
+            if channels_idx >= 0:
+                output[:d, :h, :w] = darray[tile_id, :d, ch_id, :h, :w]
+            else:
+                output[:d, :h, :w] = darray[tile_id, :d, :h, :w]
         else:
-            output[:d, :h, :w] = darray[tile_id, :d, :h, :w]
-
-    for z in range(d):
-        n5slice = output[z, :, :]
-        clipped = bg_array.clip(None, n5slice)
-        output[z, :, :] = n5slice - clipped
+            if channels_idx >= 0:
+                output[:d, :h, :w] = darray[:d, ch_id, :h, :w]
+            else:
+                output[:d, :h, :w] = darray[:d, :h, :w]
 
     tifffile.imsave(outpath, output, compression=("ZLIB", 6))
 

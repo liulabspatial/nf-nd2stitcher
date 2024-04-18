@@ -16,14 +16,17 @@ usage() {
     echo "  -p, --prestitch	    do not perform image fusion"
     echo "  -f, --fusionOnly	perform only image fusion"
 	echo "  --oneTileWins		use the one-tile-wins strategy for stitching"
+	echo "  --minSegSize		minimum size of segments (Cellpose)"
+	echo "  --diameter			diameter for segmentation (Cellpose)"
     echo "  -r, --resume    	resume a workflow execution"
 	echo "  -h, --help		    display this help and exit"
-	echo "example: ./warpswc.sh -c /opt/local/lib/cmtk/bin -s JFRC2010_20x -t JFRC2013_20x input.swc > output.swc"
 	exit 1
 }
 
 DAPI=0
 MODEL="/nrs/scicompsoft/kawaset/Liu/ESCell60X"
+MINSEGSIZE=1200
+DIAMETER=40
 
 for OPT in "$@"
 do
@@ -100,6 +103,22 @@ do
 			RSCORENUM="--rsfish_worker_cores $2"
 			shift 2
 			;;
+		'minSegSize' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
+				echo "$PROGNAME: option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			MINSEGSIZE="$2"
+			shift 2
+			;;
+		'diameter' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
+				echo "$PROGNAME: option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			DIAMETER="$2"
+			shift 2
+			;;
 		'-p'|'--prestitch' )
 			PRESTITCH="--prestitch"
 			shift 1
@@ -136,9 +155,10 @@ do
 done
 
 INPUTDIR=$(dirname "$INPUTND2")
-BGDIR=$(dirname "$BGIMG")
 
-NXFTMPDIR="$OUTDIR/nextflow_temp"
+RAND=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 13;)
+
+NXFTMPDIR="/scratch/$USER/$RAND/nextflow_temp"
 if [ ! -d "$NXFTMPDIR" ]; then
     mkdir -p "$NXFTMPDIR"
     echo "Directory created: $NXFTMPDIR"
@@ -152,7 +172,7 @@ export PATH="/groups/scicompsoft/scicompsoft/kawaset_temp:$PATH"
 export NXF_JAVA_HOME="/groups/scicompsoft/scicompsoft/kawaset_temp/tools/jdk-17" 
 cd /groups/scicompsoft/scicompsoft/kawaset_temp/nd2n5
 
-nextflow run ./nd2n5/nd2n5.nf -profile lsf $RESUME --runtime_opts "--env TMPDIR=$NXFTMPDIR -B $INPUTDIR -B $BGDIR -B /scratch" --inputPath "$INPUTND2" --outputPath "$OUTDIR" --bgimg "$BGIMG" $PRESTITCH $FUSIONONLY $ONETILEWINS $THREADNUM $WORKERNUM $CORENUM
+nextflow run ./nd2n5/nd2n5.nf -profile lsf $RESUME --runtime_opts "--env TMPDIR=$NXFTMPDIR -B $INPUTDIR -B /scratch" --inputPath "$INPUTND2" --outputPath "$OUTDIR" $PRESTITCH $FUSIONONLY $ONETILEWINS $THREADNUM $WORKERNUM $CORENUM
 
 SEARCH_DIR="$OUTDIR/easi"
 NUM_TIMEPOINTS=$(($(find "$SEARCH_DIR" -maxdepth 1 -type d | wc -l) - 1))
@@ -185,7 +205,7 @@ for (( i=0; i<NUM_TIMEPOINTS; i++ )); do
 
 	COMMON_PARAMS="-dump-channels \
         -profile lsf \
-        --runtime_opts \"--env TMPDIR=$NXFTMPDIR --env ITK_THREADS=32 -B /nrs/scicompsoft/kawaset/Liu -B $INPUTDIR -B $BGDIR -B $OUTDIR -B /scratch\" \
+        --runtime_opts \"--env TMPDIR=$NXFTMPDIR --env ITK_THREADS=32 -B /nrs/scicompsoft/kawaset/Liu -B $INPUTDIR -B $OUTDIR -B /scratch\" \
         --lsf_opts \"-P scicompsoft\" \
         $MFWORKERNUM \
         $MFCORENUM \
@@ -200,10 +220,10 @@ for (( i=0; i<NUM_TIMEPOINTS; i++ )); do
 		--aff_scale \"s3\" \
 		--def_scale \"s1\" \
         --segmentation_scale \"s1\" \
-        --segmentation_cpus 20 \
-        --segmentation_memory '250 G' \
-		--min_segsize 1200 \
-		--diameter 40 \
+        --segmentation_cpus 40 \
+        --segmentation_memory '480 G' \
+		--min_segsize $MINSEGSIZE \
+		--diameter $DIAMETER \
         --skip \"$SKIP\" \
         --use_rsfish \
         --rsfish_anisotropy 1.0 \
@@ -217,11 +237,12 @@ for (( i=0; i<NUM_TIMEPOINTS; i++ )); do
 	if [ $i == 0 ]; then
     	SKIP="stitching,spot_extraction,warp_spots,measure_intensities,assign_spots"
 		RSFISH_CLUSTER_SETTINGS="$RSWORKERNUM $RSCORENUM --rsfish_gb_per_core 15"
-		eval "nextflow run ./main.nf $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
+		#eval "nextflow run ./main.nf $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
 	else
-    	SKIP="stitching,segmentation"
+    	#SKIP="stitching,segmentation"
+		SKIP="stitching,spot_extraction,segmentation,warp_spots,measure_intensities,assign_spots"
 		RSFISH_CLUSTER_SETTINGS="$RSWORKERNUM $RSCORENUM --rsfish_gb_per_core 15"
-		bsub -n 1 -W 24:00 -o $OUTDIR/mulifish_log_t$i.txt -P scicompsoft "./main.nf -c $MULTIFISHDIR/nextflow_no_nv.config $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
+		#bsub -n 1 -W 24:00 -o $OUTDIR/mulifish_log_t$i.txt -P scicompsoft "./main.nf -c $MULTIFISHDIR/nextflow_no_nv.config $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
 		#eval "nextflow run ./main.nf -c $MULTIFISHDIR/nextflow_no_nv.config $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
 	fi
 	

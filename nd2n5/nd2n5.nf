@@ -38,7 +38,7 @@ params.spark_gb_per_core = 14
 params.spark_driver_cores = 1
 params.spark_driver_memory = '12 GB'
 
-include { getOptions } from '../utils' 
+include { getOptions; getParent } from '../utils' 
 
 include { SPARK_START         } from '../subworkflows/bits/spark_start/main'
 include { SPARK_STOP          } from '../subworkflows/bits/spark_stop/main'
@@ -52,8 +52,8 @@ include { STITCHING_PREPARE as STITCHING_PREPARE2 } from './reusables'
 process define_dataset {
     scratch true
 
-    container 'registry.int.janelia.org/liulab/nd2-to-n5-fiji:0.0.1'
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-fiji:0.0.2'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "4 GB" }
     cpus { 1 }
@@ -71,8 +71,10 @@ process define_dataset {
 }
 
 process fix_n5xml {
-    container 'registry.int.janelia.org/liulab/nd2-to-n5-py:0.0.3'
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    scratch true
+
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "4 GB" }
     cpus { 1 }
@@ -92,8 +94,8 @@ process fix_n5xml {
 process calc_stitching_resume {
     scratch true
 
-    container 'registry.int.janelia.org/liulab/nd2-to-n5-fiji:0.0.1'
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-fiji:0.0.2'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "${params.mem_gb} GB" }
     cpus { params.cpus }
@@ -113,8 +115,8 @@ process calc_stitching_resume {
 process calc_stitching {
     scratch true
 
-    container 'registry.int.janelia.org/liulab/nd2-to-n5-fiji:0.0.1'
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-fiji:0.0.2'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "${params.mem_gb} GB" }
     cpus { params.cpus }
@@ -136,8 +138,8 @@ process calc_stitching {
 process gen_csv {
     scratch true
 
-    container 'registry.int.janelia.org/liulab/nd2-to-n5-py:0.0.3'
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "4 GB" }
     cpus { 1 }
@@ -157,8 +159,8 @@ process gen_csv {
 process split_xml {
     scratch true
 
-    container 'registry.int.janelia.org/liulab/nd2-to-n5-py:0.0.3'
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "4 GB" }
     cpus { 1 }
@@ -179,8 +181,8 @@ process split_xml {
 process nd2tiff {
     scratch true
 
-    container 'registry.int.janelia.org/liulab/nd2-to-n5-py:0.0.3'
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "16 GB" }
     cpus { 1 }
@@ -193,7 +195,7 @@ process nd2tiff {
     
     script:
     """
-    /entrypoint.sh nd2tiff -i $src -o $tar -b $bg
+    /entrypoint.sh nd2tiff -i $src -o $tar
     """
 }
 
@@ -202,7 +204,7 @@ process SPARK_RESAVE {
 
     tag "${meta.id}"
     container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.3'
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
 
@@ -249,7 +251,7 @@ process SPARK_DOWNSAMPLE {
 
     tag "${meta.id}"
     container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.6'
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
 
@@ -289,7 +291,7 @@ process SPARK_FUSION {
 
     tag "${meta.id}"
     container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.6'
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
 
@@ -333,8 +335,8 @@ process SPARK_FUSION {
 process fix_res {
     scratch true
 
-    container 'registry.int.janelia.org/liulab/nd2-to-n5-py:0.0.3'
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "4 GB" }
     cpus { 1 }
@@ -355,7 +357,7 @@ process fix_res {
 process remove_dir {
     scratch true
 
-    containerOptions { getOptions([params.inputPath, params.outputPath]) }
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "16 GB" }
     cpus { 2 }
@@ -410,7 +412,7 @@ workflow {
         .set { csvfile }
 
         csvfile
-        .splitCsv(header:false)
+        .splitCsv(header:false, sep: '\t')
         .map { row-> row[0] }
         .set { flist }
 
@@ -426,7 +428,7 @@ workflow {
         .set { csvfile2 }
 
         csvfile2
-        .splitCsv(header:false)
+        .splitCsv(header:false, sep: '\t')
         .map { row-> row[0] }
         .set { flist2 }
 
@@ -462,6 +464,16 @@ workflow {
 
         SPARK_RESAVE(SPARK_START.out)
         done = SPARK_STOP(SPARK_RESAVE.out.acquisitions)
+
+        single_tile_check_file = file(params.outputPath + "/tmp/SingleTile")
+        if (single_tile_check_file.exists()) {
+            println "Single tile image"
+            param5 = SPARK_RESAVE.out.acquisitions.map{ tuple("${it[0].resave_outxml}", "${outdir}/easi") }
+            fix_res(param5, SPARK_STOP.out.collect())
+
+            tmpdir_ch = Channel.fromPath(tmpdir)
+            remove_dir(tmpdir_ch, fix_res.out.control_1.collect())
+        }
     }
     else
     {
@@ -483,54 +495,56 @@ workflow {
         flist2.map{ tuple("${outdir}/${file(it).baseName}/${file(it).baseName}_resaved.xml", "$it") }.set{ param_resaved }
     }
 
-    if ( params.prestitch ) {
-        tmpdir_ch = Channel.fromPath(tmpdir)
-        remove_dir(tmpdir_ch, SPARK_STOP.out.collect())
-    }
-    else {
-        if ( !params.fusionOnly ) {
-            calc_results = calc_stitching(SPARK_RESAVE.out.acquisitions, done)
+    if (!single_tile_check_file.exists()) {
+        if ( params.prestitch ) {
+            tmpdir_ch = Channel.fromPath(tmpdir)
+            remove_dir(tmpdir_ch, SPARK_STOP.out.collect())
         }
         else {
-            calc_results = calc_stitching_resume(param_resaved)
+            if ( !params.fusionOnly ) {
+                calc_results = calc_stitching(SPARK_RESAVE.out.acquisitions, done)
+            }
+            else {
+                calc_results = calc_stitching_resume(param_resaved)
+            }
+            calc_results.map {
+                def xml = it
+                meta = [:]
+                meta.id = file(xml).baseName + "_resaved"
+                meta.spark_work_dir = "${outdir}/spark/${workflow.sessionId}/${meta.id}"
+                meta.indir = outdir + "/" + file(xml).baseName
+                meta.tmpdir = tmpdir
+                meta.fusion_inxml = meta.indir + "/" + meta.id + ".xml"
+                meta.fusion_outxml = meta.tmpdir + "/" + file(xml).baseName + "_fused.xml"
+                meta.fusion_n5dir = meta.tmpdir + "/" + file(xml).baseName + "_fused.n5"
+                [meta, xml]
+            }.set { ch_acquisitions2 }
+
+
+            STITCHING_PREPARE2(
+                ch_acquisitions2
+            )
+
+            SPARK_START2(
+                STITCHING_PREPARE2.out, 
+                [indir, outdir], //directories to mount
+                params.spark_cluster,
+                params.spark_workers as int,
+                params.spark_worker_cores as int,
+                params.spark_gb_per_core as int,
+                params.spark_driver_cores as int,
+                params.spark_driver_memory
+            )
+
+            SPARK_FUSION(SPARK_START2.out)
+
+            done = SPARK_STOP2(SPARK_FUSION.out.acquisitions)
+
+            param5 = SPARK_FUSION.out.acquisitions.map{ tuple("${it[0].fusion_outxml}", "${outdir}/easi") }
+            fix_res(param5, SPARK_STOP2.out.collect())
+
+            tmpdir_ch = Channel.fromPath(tmpdir)
+            remove_dir(tmpdir_ch, fix_res.out.control_1.collect())
         }
-        calc_results.map {
-            def xml = it
-            meta = [:]
-            meta.id = file(xml).baseName + "_resaved"
-            meta.spark_work_dir = "${outdir}/spark/${workflow.sessionId}/${meta.id}"
-            meta.indir = outdir + "/" + file(xml).baseName
-            meta.tmpdir = tmpdir
-            meta.fusion_inxml = meta.indir + "/" + meta.id + ".xml"
-            meta.fusion_outxml = meta.tmpdir + "/" + file(xml).baseName + "_fused.xml"
-            meta.fusion_n5dir = meta.tmpdir + "/" + file(xml).baseName + "_fused.n5"
-            [meta, xml]
-        }.set { ch_acquisitions2 }
-
-
-        STITCHING_PREPARE2(
-            ch_acquisitions2
-        )
-
-        SPARK_START2(
-            STITCHING_PREPARE2.out, 
-            [indir, outdir], //directories to mount
-            params.spark_cluster,
-            params.spark_workers as int,
-            params.spark_worker_cores as int,
-            params.spark_gb_per_core as int,
-            params.spark_driver_cores as int,
-            params.spark_driver_memory
-        )
-
-        SPARK_FUSION(SPARK_START2.out)
-
-        done = SPARK_STOP2(SPARK_FUSION.out.acquisitions)
-
-        param5 = SPARK_FUSION.out.acquisitions.map{ tuple("${it[0].fusion_outxml}", "${outdir}/easi") }
-        fix_res(param5, SPARK_STOP2.out.collect())
-
-        tmpdir_ch = Channel.fromPath(tmpdir)
-        remove_dir(tmpdir_ch, fix_res.out.control_1.collect())
     }
 }

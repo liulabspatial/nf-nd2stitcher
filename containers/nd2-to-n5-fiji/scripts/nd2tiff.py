@@ -43,7 +43,6 @@ def nd2tiff():
     input = args.input
     outpath = args.output
     outdir = os.path.dirname(outpath)
-    bg = args.bg
 
     numbers = re.findall(r'\d+', outpath)
     time_id = int(numbers[len(numbers)-1])
@@ -67,15 +66,8 @@ def nd2tiff():
     h = darray.shape[4]
     w = darray.shape[5]
 
-    bg_array = tifffile.imread(bg, is_shaped=False)
-
     output = np.zeros((d, h, w), dtype=darray.dtype)
     output[:d, :h, :w] = darray[time_id, tile_id, :d, ch_id, :h, :w]
-
-    for z in range(d):
-        n5slice = output[z, :, :]
-        clipped = bg_array.clip(None, n5slice)
-        output[z, :, :] = n5slice - clipped
 
     tifffile.imsave(outpath, output, compression=("ZLIB", 6))
 

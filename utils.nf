@@ -15,3 +15,7 @@ def getOptions(paths) {
     }
 }
 
+def getParent(path) { 
+    def parent = file(path).parent
+    return "${parent}"
+}

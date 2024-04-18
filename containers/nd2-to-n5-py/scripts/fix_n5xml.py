@@ -36,37 +36,36 @@ def main():
     if args.verbose:
         logging.basicConfig(level=logging.INFO)
 
-    input = args.input.split(",")
-    output = args.output.split(",")
+    input = args.input
+    output = args.output
 
-    for i in range(0, len(input)):
-        dataname = os.path.basename(input[i])
-        indirpath = os.path.dirname(input[i])
-        stem = os.path.splitext(dataname)[0]
+    dataname = os.path.basename(input)
+    indirpath = os.path.dirname(input)
+    stem = os.path.splitext(dataname)[0]
 
-        xml = ET.parse(input[i])
-        for item in xml.findall(".//ViewTransform"):
-            name = item.find("./Name").text
-            if name == "Translation":
-                str_mat = item.find("affine")
-                print(str_mat.text)
-                mat_str_array = str_mat.text.split(" ")
-                out_str_mat = ""
-                count = 0
-                for elem in mat_str_array:
-                    if count == 7:
-                        fval = float(elem)
-                        fval *= -1.0
-                        out_str_mat += " " + str(fval)
-                    else:
-                        if count > 0:
-                            out_str_mat += " "
-                        out_str_mat += elem
-                    count += 1
-                print(out_str_mat)
-                str_mat.text = out_str_mat
+    xml = ET.parse(input)
+    for item in xml.findall(".//ViewTransform"):
+        name = item.find("./Name").text
+        if name == "Translation":
+            str_mat = item.find("affine")
+            print(str_mat.text)
+            mat_str_array = str_mat.text.split(" ")
+            out_str_mat = ""
+            count = 0
+            for elem in mat_str_array:
+                if count == 7:
+                    fval = float(elem)
+                    fval *= -1.0
+                    out_str_mat += " " + str(fval)
+                else:
+                    if count > 0:
+                        out_str_mat += " "
+                    out_str_mat += elem
+                count += 1
+            print(out_str_mat)
+            str_mat.text = out_str_mat
 
-        xml.write(output[i])
+    xml.write(output)
 
     
 

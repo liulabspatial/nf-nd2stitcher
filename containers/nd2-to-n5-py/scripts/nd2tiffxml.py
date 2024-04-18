@@ -37,46 +37,45 @@ def main():
     if args.verbose:
         logging.basicConfig(level=logging.INFO)
 
-    input = args.input.split(",")
-    output = args.output.split(",")
+    input = args.input
+    output = args.output
     csvoutput = args.csv
 
     outlist = []
 
-    for i in range(0, len(input)):
-        for t in range(0, 100):
-            dataname = os.path.basename(output[0])
-            outdirpath = os.path.dirname(output[0])
-            stem = os.path.splitext(dataname)[0]
+    for t in range(0, 100):
+        dataname = os.path.basename(output)
+        outdirpath = os.path.dirname(output)
+        stem = os.path.splitext(dataname)[0]
 
-            found = False
-            xml = ET.parse(input[i])
-            parent_map = {c: p for p in xml.iter() for c in p}
-            for item in xml.findall(".//FileMapping"):
-                tile_id = int(item.attrib['series'])
-                time_id = int(item.attrib['timepoint'])
-                ch_id = int(item.attrib['channel'])
-                if time_id == t:
-                    file = item.find("./file")
-                    file.text = "./tiff_" + str(tile_id) + "_" + str(ch_id) + "_" + str(time_id) + ".tif"
-                    item.attrib['series'] = '0';
-                    item.attrib['timepoint'] = '0';
-                    item.attrib['channel'] = '0';
-                    found = True
-                else:
-                    parent_map[item].remove(item)
-            for item in xml.findall(".//ViewRegistration"):
-                time_id = int(item.attrib['timepoint'])
-                if time_id != t:
-                    parent_map[item].remove(item)
-                else:
-                    item.attrib['timepoint'] = '0';
-            for item in xml.findall(".//Timepoints"):
-                item.find("./last").text = '0'
-            if found == True:
-                opath = os.path.join(outdirpath, stem + "-t" + str(t) + ".xml")
-                xml.write(opath)
-                outlist.append(opath)
+        found = False
+        xml = ET.parse(input)
+        parent_map = {c: p for p in xml.iter() for c in p}
+        for item in xml.findall(".//FileMapping"):
+            tile_id = int(item.attrib['series'])
+            time_id = int(item.attrib['timepoint'])
+            ch_id = int(item.attrib['channel'])
+            if time_id == t:
+                file = item.find("./file")
+                file.text = "./tiff_" + str(tile_id) + "_" + str(ch_id) + "_" + str(time_id) + ".tif"
+                item.attrib['series'] = '0';
+                item.attrib['timepoint'] = '0';
+                item.attrib['channel'] = '0';
+                found = True
+            else:
+                parent_map[item].remove(item)
+        for item in xml.findall(".//ViewRegistration"):
+            time_id = int(item.attrib['timepoint'])
+            if time_id != t:
+                parent_map[item].remove(item)
+            else:
+                item.attrib['timepoint'] = '0';
+        for item in xml.findall(".//Timepoints"):
+            item.find("./last").text = '0'
+        if found == True:
+            opath = os.path.join(outdirpath, stem + "-t" + str(t) + ".xml")
+            xml.write(opath)
+            outlist.append(opath)
     
     with open(csvoutput, 'w') as csvfile:
         for fname in outlist:
