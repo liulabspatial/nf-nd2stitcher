@@ -46,8 +46,11 @@ include { SPARK_STOP          } from '../subworkflows/bits/spark_stop/main'
 include { SPARK_START as SPARK_START2 } from '../subworkflows/bits/spark_start/main'
 include { SPARK_STOP as SPARK_STOP2 } from '../subworkflows/bits/spark_stop/main'
 
-include { STITCHING_PREPARE } from './reusables'
-include { STITCHING_PREPARE as STITCHING_PREPARE2 } from './reusables'
+include { SPARK_STOP as SPARK_STOP_SINGLE } from '../subworkflows/bits/spark_stop/main'
+
+include { STITCHING_PREPARE; remove_dir } from './reusables'
+include { STITCHING_PREPARE as STITCHING_PREPARE2} from './reusables'
+include { remove_dir as remove_dir_single} from './reusables'
 
 process define_dataset {
     scratch true
@@ -246,6 +249,53 @@ process SPARK_RESAVE {
     """
 }
 
+process SPARK_RESAVE_WITH_DOWNSAMPLE {
+    scratch true
+
+    tag "${meta.id}"
+    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.3'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
+    cpus { spark.driver_cores }
+    memory { spark.driver_memory }
+
+    input:
+    tuple val(meta), path(xml), val(spark)
+
+    output:
+    tuple val(meta), path(xml), val(spark), emit: acquisitions
+    path "versions.yml", emit: versions
+
+    when:
+    task.ext.when == null || task.ext.when
+
+    script:
+    extra_args = task.ext.args ?: ''
+    executor_memory = spark.executor_memory.replace(" KB",'k').replace(" MB",'m').replace(" GB",'g').replace(" TB",'t')
+    driver_memory = spark.driver_memory.replace(" KB",'k').replace(" MB",'m').replace(" GB",'g').replace(" TB",'t')
+    outdir = meta.outdir
+    inxml = meta.resave_inxml
+    tmpxml = meta.tmpdir + "/" + meta.id + "_resaved.xml"
+    outxml = meta.resave_outxml
+    tmpn5dir = meta.tmpdir + "/" + meta.id + "_resaved.n5"
+    n5dir = meta.resave_n5dir
+    """
+    /opt/scripts/runapp.sh "$workflow.containerEngine" "$spark.work_dir" "$spark.uri" \
+        /app/app.jar net.preibisch.bigstitcher.spark.ResaveN5 \
+        $spark.parallelism $spark.worker_cores "$executor_memory" $spark.driver_cores "$driver_memory" \
+        -x ${inxml} -xo ${tmpxml} -o ${tmpn5dir} --blockSize ${params.blockSize} -ds "1,1,1;2,2,2;4,4,4;8,8,8;16,16,16"
+
+    mkdir -p ${outdir}
+    mv ${tmpxml} ${outxml}
+    mv ${tmpn5dir} ${n5dir}
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        spark: \$(cat /opt/spark/VERSION)
+        stitching-spark: \$(cat /app/VERSION)
+    END_VERSIONS
+    """
+}
+
 process SPARK_DOWNSAMPLE {
     scratch true
 
@@ -354,24 +404,25 @@ process fix_res {
     """
 }
 
-process remove_dir {
+process fix_res_single {
     scratch true
 
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
-    memory { "16 GB" }
-    cpus { 2 }
+    memory { "4 GB" }
+    cpus { 1 }
 
     input:
-    val(tar)
+    tuple val(src), val(dst), val(xml)
     val(control_1) 
 
     output:
-    val "${tar}"
+    val("process_complete"), emit: control_1
     
     script:
     """
-    rm -rf $tar
+    /entrypoint.sh fix_res -i $src -o $dst -x $xml
     """
 }
 
@@ -379,7 +430,7 @@ workflow {
     infile = params.inputPath
     indir = file(params.inputPath).parent
     outdir = params.outputPath
-    tmpdir = params.outputPath + "/tmp"
+    tmpdir = params.outputPath + "/tmp_" + workflow.sessionId.toString()
     sparkdir = params.outputPath + "/spark"
     bgpath = params.bgimg
 
@@ -444,6 +495,7 @@ workflow {
             meta.resave_inxml = xml
             meta.resave_outxml = meta.outdir + "/" + meta.id + "_resaved.xml"
             meta.resave_n5dir = meta.outdir + "/" + meta.id + "_resaved.n5"
+            meta.single_tile = "${tmpdir}/SingleTile"
             [meta, xml]
         }.set { ch_acquisitions }
 
@@ -451,7 +503,7 @@ workflow {
             ch_acquisitions
         )
 
-        SPARK_START(
+        sp_start = SPARK_START(
             STITCHING_PREPARE.out, 
             [indir, outdir], //directories to mount
             params.spark_cluster,
@@ -462,18 +514,22 @@ workflow {
             params.spark_driver_memory
         )
 
-        SPARK_RESAVE(SPARK_START.out)
+        sp_start.branch {
+            single: file(it[0].single_tile).exists() == true
+            multi: file(it[0].single_tile).exists() == false
+        }.set{ sp_start_branching }
+
+        SPARK_RESAVE(sp_start_branching.multi)
         done = SPARK_STOP(SPARK_RESAVE.out.acquisitions)
 
-        single_tile_check_file = file(params.outputPath + "/tmp/SingleTile")
-        if (single_tile_check_file.exists()) {
-            println "Single tile image"
-            param5 = SPARK_RESAVE.out.acquisitions.map{ tuple("${it[0].resave_outxml}", "${outdir}/easi") }
-            fix_res(param5, SPARK_STOP.out.collect())
+        SPARK_RESAVE_WITH_DOWNSAMPLE(sp_start_branching.single)
+        done_single = SPARK_STOP_SINGLE(SPARK_RESAVE_WITH_DOWNSAMPLE.out.acquisitions)
+        param_single = SPARK_RESAVE_WITH_DOWNSAMPLE.out.acquisitions.map{ tuple("${it[0].resave_outxml}", "${outdir}/easi", "${it[0].resave_outxml}") }
+        fix_res_single(param_single, SPARK_STOP_SINGLE.out.collect())
 
-            tmpdir_ch = Channel.fromPath(tmpdir)
-            remove_dir(tmpdir_ch, fix_res.out.control_1.collect())
-        }
+        tmpdir_ch_single = Channel.fromPath(tmpdir)
+        remove_dir_single(tmpdir_ch_single, fix_res_single.out.control_1.collect())
+        
     }
     else
     {
@@ -495,56 +551,54 @@ workflow {
         flist2.map{ tuple("${outdir}/${file(it).baseName}/${file(it).baseName}_resaved.xml", "$it") }.set{ param_resaved }
     }
 
-    if (!single_tile_check_file.exists()) {
-        if ( params.prestitch ) {
-            tmpdir_ch = Channel.fromPath(tmpdir)
-            remove_dir(tmpdir_ch, SPARK_STOP.out.collect())
+    if ( params.prestitch ) {
+        tmpdir_ch = Channel.fromPath(tmpdir)
+        remove_dir(tmpdir_ch, SPARK_STOP.out.collect())
+    }
+    else {
+        if ( !params.fusionOnly ) {
+            calc_results = calc_stitching(SPARK_RESAVE.out.acquisitions, done)
         }
         else {
-            if ( !params.fusionOnly ) {
-                calc_results = calc_stitching(SPARK_RESAVE.out.acquisitions, done)
-            }
-            else {
-                calc_results = calc_stitching_resume(param_resaved)
-            }
-            calc_results.map {
-                def xml = it
-                meta = [:]
-                meta.id = file(xml).baseName + "_resaved"
-                meta.spark_work_dir = "${outdir}/spark/${workflow.sessionId}/${meta.id}"
-                meta.indir = outdir + "/" + file(xml).baseName
-                meta.tmpdir = tmpdir
-                meta.fusion_inxml = meta.indir + "/" + meta.id + ".xml"
-                meta.fusion_outxml = meta.tmpdir + "/" + file(xml).baseName + "_fused.xml"
-                meta.fusion_n5dir = meta.tmpdir + "/" + file(xml).baseName + "_fused.n5"
-                [meta, xml]
-            }.set { ch_acquisitions2 }
-
-
-            STITCHING_PREPARE2(
-                ch_acquisitions2
-            )
-
-            SPARK_START2(
-                STITCHING_PREPARE2.out, 
-                [indir, outdir], //directories to mount
-                params.spark_cluster,
-                params.spark_workers as int,
-                params.spark_worker_cores as int,
-                params.spark_gb_per_core as int,
-                params.spark_driver_cores as int,
-                params.spark_driver_memory
-            )
-
-            SPARK_FUSION(SPARK_START2.out)
-
-            done = SPARK_STOP2(SPARK_FUSION.out.acquisitions)
-
-            param5 = SPARK_FUSION.out.acquisitions.map{ tuple("${it[0].fusion_outxml}", "${outdir}/easi") }
-            fix_res(param5, SPARK_STOP2.out.collect())
-
-            tmpdir_ch = Channel.fromPath(tmpdir)
-            remove_dir(tmpdir_ch, fix_res.out.control_1.collect())
+            calc_results = calc_stitching_resume(param_resaved)
         }
+        calc_results.map {
+            def xml = it
+            meta = [:]
+            meta.id = file(xml).baseName + "_resaved"
+            meta.spark_work_dir = "${outdir}/spark/${workflow.sessionId}/${meta.id}"
+            meta.indir = outdir + "/" + file(xml).baseName
+            meta.tmpdir = tmpdir
+            meta.fusion_inxml = meta.indir + "/" + meta.id + ".xml"
+            meta.fusion_outxml = meta.tmpdir + "/" + file(xml).baseName + "_fused.xml"
+            meta.fusion_n5dir = meta.tmpdir + "/" + file(xml).baseName + "_fused.n5"
+            [meta, xml]
+        }.set { ch_acquisitions2 }
+
+
+        STITCHING_PREPARE2(
+            ch_acquisitions2
+        )
+
+        SPARK_START2(
+            STITCHING_PREPARE2.out, 
+            [indir, outdir], //directories to mount
+            params.spark_cluster,
+            params.spark_workers as int,
+            params.spark_worker_cores as int,
+            params.spark_gb_per_core as int,
+            params.spark_driver_cores as int,
+            params.spark_driver_memory
+        )
+
+        SPARK_FUSION(SPARK_START2.out)
+
+        done = SPARK_STOP2(SPARK_FUSION.out.acquisitions)
+
+        param5 = SPARK_FUSION.out.acquisitions.map{ tuple("${it[0].fusion_outxml}", "${outdir}/easi") }
+        fix_res(param5, SPARK_STOP2.out.collect())
+
+        tmpdir_ch = Channel.fromPath(tmpdir)
+        remove_dir(tmpdir_ch, fix_res.out.control_1.collect())
     }
 }

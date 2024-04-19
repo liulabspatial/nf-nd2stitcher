@@ -27,6 +27,7 @@ def main():
     parser = argparse.ArgumentParser(description=usage_text)
     parser.add_argument("-i", "--input", dest="input", type=str, default=None, help="input directory")
     parser.add_argument("-o", "--output", dest="output", type=str, default=None, help="output directory")
+    parser.add_argument("-x", "--xml", dest="xml", type=str, default=None, help="original bigstitcher xml")
     parser.add_argument("--verbose", dest="verbose", default=False, action="store_true", help="enable verbose logging")
 
     if not argv:
@@ -40,11 +41,20 @@ def main():
 
     input = args.input
     output = args.output
+    xml = args.xml
     t_ints = [int(s) for s in re.findall("\d+", input)]
     time = t_ints[-1]
     print("time: " + str(time))
 
     res = [1.0, 1.0, 1.0]
+    if xml is not None and os.path.exists(xml):
+        xml = ET.parse(xml)
+        for item in xml.findall(".//voxelSize"):
+            size = item.find("./size").text
+            res = [float(i) for i in size.split()]
+            break
+    
+    print(res)
 
     re_setup = re.compile(r'^.*setup[0-9]+$')
     re_timepoint = re.compile(r'^.*timepoint[0-9]+$')
