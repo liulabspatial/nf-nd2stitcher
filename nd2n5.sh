@@ -1,26 +1,27 @@
 #!/bin/bash
-
 usage() {
 	echo "Usage: nd2n5.sh [OPTION]... [FILE]"
-	echo "ND2-to-N5 converter"
+	echo "ND2 Stitching Pipeline"
 	echo
 	echo "Options:"
 	echo "  -i, --input		    path to an input nd2 file"
 	echo "  -o, --outdir    	path to an output directory"
-	echo "  -b, --bg		    path to a background image for background subtraction"
 	echo "  -d, --dapi		    channel id of a dapi channel."
     echo "  -t, --thread    	number of threads for non-spark processes"
     echo "  -w, --worker    	number of workers for spark processes"
     echo "  -c, --core    	    number of cores per worker for spark processes"
     echo "  -p, --prestitch	    do not perform image fusion"
     echo "  -f, --fusionOnly	perform only image fusion"
+	echo "  --oneTileWins		use the one-tile-wins strategy for stitching"
     echo "  -r, --resume    	resume a workflow execution"
 	echo "  -h, --help		    display this help and exit"
-	echo "example: ./warpswc.sh -c /opt/local/lib/cmtk/bin -s JFRC2010_20x -t JFRC2013_20x input.swc > output.swc"
 	exit 1
 }
 
 DAPI=0
+MODEL="/nrs/scicompsoft/kawaset/Liu/ESCell60X"
+MINSEGSIZE=1200
+DIAMETER=40
 
 for OPT in "$@"
 do
@@ -45,14 +46,6 @@ do
 			OUTDIR="$2"
 			shift 2
 			;;
-		'-b'|'--bg' )
-			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
-				echo "$PROGNAME: option requires an argument -- $1" 1>&2
-				exit 1
-			fi
-			BGIMG="$2"
-			shift 2
-			;;
 		'-d'|'--dapi' )
 			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
 				echo "$PROGNAME: option requires an argument -- $1" 1>&2
@@ -75,6 +68,8 @@ do
 				exit 1
 			fi
 			WORKERNUM="--spark_workers $2"
+			MFWORKERNUM="--workers $2"
+			RSWORKERNUM="--rsfish_workers $2"
 			shift 2
 			;;
         '-c'|'--core' )
@@ -83,6 +78,8 @@ do
 				exit 1
 			fi
 			CORENUM="--spark_worker_cores $2"
+			MFCORENUM="--worker_cores $2"
+			RSCORENUM="--rsfish_worker_cores $2"
 			shift 2
 			;;
 		'-p'|'--prestitch' )
@@ -91,6 +88,10 @@ do
 			;;
         '-f'|'--fusionOnly' )
 			FUSIONONLY="--fusionOnly"
+			shift 1
+			;;
+		'--oneTileWins' )
+			ONETILEWINS="--oneTileWins"
 			shift 1
 			;;
         '-r'|'--resume' )
@@ -117,10 +118,21 @@ do
 done
 
 INPUTDIR=$(dirname "$INPUTND2")
-BGDIR=$(dirname "$BGIMG")
 
+RAND=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 13;)
+
+NXFTMPDIR="/scratch/$USER/$RAND/nextflow_temp"
+if [ ! -d "$NXFTMPDIR" ]; then
+    mkdir -p "$NXFTMPDIR"
+    echo "Directory created: $NXFTMPDIR"
+else
+    echo "Directory already exists: $NXFTMPDIR"
+fi
+
+export TMPDIR="$NXFTMPDIR"
+export NXF_TEMP="$NXFTMPDIR"
 export PATH="/groups/scicompsoft/scicompsoft/kawaset_temp:$PATH"
 export NXF_JAVA_HOME="/groups/scicompsoft/scicompsoft/kawaset_temp/tools/jdk-17" 
 cd /groups/scicompsoft/scicompsoft/kawaset_temp/nd2n5
 
-/nrs/scicompsoft/kawaset/Liu/nextflow run ./nd2n5/nd2n5.nf -profile lsf $RESUME --runtime_opts "-B $INPUTDIR -B $BGDIR -B /scratch" --inputPath "$INPUTND2" --outputPath "$OUTDIR" --bgimg "$BGIMG" $PRESTITCH $FUSIONONLY $THREADNUM $WORKERNUM $CORENUM
+nextflow run ./nd2n5/nd2n5.nf -profile lsf $RESUME --runtime_opts "--env TMPDIR=$NXFTMPDIR -B $INPUTDIR -B /scratch" --dapi_channel \"$DAPI\" --inputPath "$INPUTND2" --outputPath "$OUTDIR" $PRESTITCH $FUSIONONLY $ONETILEWINS $THREADNUM $WORKERNUM $CORENUM

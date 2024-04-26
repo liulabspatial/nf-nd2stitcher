@@ -14,6 +14,8 @@ params.bgimg = ""
 
 params.prestitch = false
 
+params.dapi_channel = ""
+
 params.fusionOnly = false
 
 params.oneTileWins = false
@@ -46,10 +48,14 @@ include { SPARK_STOP          } from '../subworkflows/bits/spark_stop/main'
 include { SPARK_START as SPARK_START2 } from '../subworkflows/bits/spark_start/main'
 include { SPARK_STOP as SPARK_STOP2 } from '../subworkflows/bits/spark_stop/main'
 
+include { SPARK_START as SPARK_START3 } from '../subworkflows/bits/spark_start/main'
+include { SPARK_STOP as SPARK_STOP3 } from '../subworkflows/bits/spark_stop/main'
+
 include { SPARK_STOP as SPARK_STOP_SINGLE } from '../subworkflows/bits/spark_stop/main'
 
 include { STITCHING_PREPARE; remove_dir } from './reusables'
 include { STITCHING_PREPARE as STITCHING_PREPARE2} from './reusables'
+include { STITCHING_PREPARE as STITCHING_PREPARE3} from './reusables'
 include { remove_dir as remove_dir_single} from './reusables'
 
 process define_dataset {
@@ -76,7 +82,7 @@ process define_dataset {
 process fix_n5xml {
     scratch true
 
-    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.6'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "4 GB" }
@@ -141,7 +147,7 @@ process calc_stitching {
 process gen_csv {
     scratch true
 
-    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.6'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "4 GB" }
@@ -162,7 +168,7 @@ process gen_csv {
 process split_xml {
     scratch true
 
-    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.6'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "4 GB" }
@@ -184,7 +190,7 @@ process split_xml {
 process nd2tiff {
     scratch true
 
-    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.6'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "16 GB" }
@@ -199,6 +205,54 @@ process nd2tiff {
     script:
     """
     /entrypoint.sh nd2tiff -i $src -o $tar
+    """
+}
+
+process padding {
+    scratch true
+
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.6'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
+
+    memory { "${params.mem_gb} GB" }
+    cpus { params.cpus }
+
+    input:
+    tuple val(meta), path(files), val(spark)
+    val(control_1)
+
+    output:
+    tuple val(meta), path(files), val(spark), emit: acquisitions
+    
+    script:
+    n5dir = meta.padding_n5dir
+    dapi = meta.dapi
+    """
+    /entrypoint.sh padding -i $n5dir -c $dapi -s "s0" -t ${params.cpus}
+    """
+}
+
+process padding_single {
+    scratch true
+
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.6'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
+
+    memory { "${params.mem_gb} GB" }
+    cpus { params.cpus }
+
+    input:
+    tuple val(meta), path(files), val(spark)
+    val(control_1) 
+
+    output:
+    tuple val(meta), path(files), val(spark), emit: acquisitions
+    
+    script:
+    n5dir = meta.padding_n5dir
+    dapi = meta.dapi
+    """
+    /entrypoint.sh padding -i $n5dir -c $dapi -s "s0" -t ${params.cpus}
     """
 }
 
@@ -282,7 +336,7 @@ process SPARK_RESAVE_WITH_DOWNSAMPLE {
     /opt/scripts/runapp.sh "$workflow.containerEngine" "$spark.work_dir" "$spark.uri" \
         /app/app.jar net.preibisch.bigstitcher.spark.ResaveN5 \
         $spark.parallelism $spark.worker_cores "$executor_memory" $spark.driver_cores "$driver_memory" \
-        -x ${inxml} -xo ${tmpxml} -o ${tmpn5dir} --blockSize ${params.blockSize} -ds "1,1,1;2,2,2;4,4,4;8,8,8;16,16,16"
+        -x ${inxml} -xo ${tmpxml} -o ${tmpn5dir} --blockSize ${params.blockSize} -ds "1,1,1"
 
     mkdir -p ${outdir}
     mv ${tmpxml} ${outxml}
@@ -372,7 +426,7 @@ process SPARK_FUSION {
         /opt/scripts/runapp.sh "$workflow.containerEngine" "$spark.work_dir" "$spark.uri" \
             /app/app.jar net.preibisch.bigstitcher.spark.AffineFusion \
             $spark.parallelism $spark.worker_cores "$executor_memory" $spark.driver_cores "$driver_memory" \
-            --bdv 0,\$i --channelId \$i -x ${inxml} -xo ${outxml} -o ${n5dir} --blockSize ${params.blockSize} ${oneTileWins} --UINT16 --minIntensity 0.0 --maxIntensity 65535.0 --downsampling "1,1,1;2,2,2;4,4,4;8,8,8;16,16,16"
+            --bdv 0,\$i --channelId \$i -x ${inxml} -xo ${outxml} -o ${n5dir} --blockSize ${params.blockSize} ${oneTileWins} --UINT16 --minIntensity 0.0 --maxIntensity 65535.0 --downsampling "1,1,1"
     done
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -385,7 +439,7 @@ process SPARK_FUSION {
 process fix_res {
     scratch true
 
-    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.6'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "4 GB" }
@@ -407,7 +461,7 @@ process fix_res {
 process fix_res_single {
     scratch true
 
-    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.5'
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-py:0.0.6'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "4 GB" }
@@ -496,6 +550,8 @@ workflow {
             meta.resave_outxml = meta.outdir + "/" + meta.id + "_resaved.xml"
             meta.resave_n5dir = meta.outdir + "/" + meta.id + "_resaved.n5"
             meta.single_tile = "${tmpdir}/SingleTile"
+            meta.dapi = "${params.dapi_channel}"
+            meta.padding_n5dir = meta.outdir + "/" + meta.id + "_resaved.xml"
             [meta, xml]
         }.set { ch_acquisitions }
 
@@ -524,7 +580,10 @@ workflow {
 
         SPARK_RESAVE_WITH_DOWNSAMPLE(sp_start_branching.single)
         done_single = SPARK_STOP_SINGLE(SPARK_RESAVE_WITH_DOWNSAMPLE.out.acquisitions)
-        param_single = SPARK_RESAVE_WITH_DOWNSAMPLE.out.acquisitions.map{ tuple("${it[0].resave_outxml}", "${outdir}/easi", "${it[0].resave_outxml}") }
+
+        padding_single(SPARK_RESAVE_WITH_DOWNSAMPLE.out.acquisitions, SPARK_STOP_SINGLE.out.collect())
+
+        param_single = padding_single.out.acquisitions.map{ tuple("${it[0].resave_outxml}", "${outdir}/easi", "${it[0].resave_outxml}") }
         fix_res_single(param_single, SPARK_STOP_SINGLE.out.collect())
 
         tmpdir_ch_single = Channel.fromPath(tmpdir)
@@ -572,6 +631,10 @@ workflow {
             meta.fusion_inxml = meta.indir + "/" + meta.id + ".xml"
             meta.fusion_outxml = meta.tmpdir + "/" + file(xml).baseName + "_fused.xml"
             meta.fusion_n5dir = meta.tmpdir + "/" + file(xml).baseName + "_fused.n5"
+            meta.dapi = "${params.dapi_channel}"
+            meta.padding_n5dir = meta.tmpdir + "/" + file(xml).baseName + "_fused.n5"
+            meta.ds_outxml = meta.tmpdir + "/" + file(xml).baseName + "_ds.xml"
+            meta.ds_n5dir = meta.tmpdir + "/" + file(xml).baseName + "_ds.n5"
             [meta, xml]
         }.set { ch_acquisitions2 }
 
@@ -595,8 +658,39 @@ workflow {
 
         done = SPARK_STOP2(SPARK_FUSION.out.acquisitions)
 
-        param5 = SPARK_FUSION.out.acquisitions.map{ tuple("${it[0].fusion_outxml}", "${outdir}/easi") }
-        fix_res(param5, SPARK_STOP2.out.collect())
+        padding(SPARK_FUSION.out.acquisitions, SPARK_STOP2.out.collect())
+
+        padding.out.acquisitions.map {
+            def xml = it[1]
+            meta = it[0]
+            meta.id = file(xml).baseName + "_fused"
+            meta.spark_work_dir = "${outdir}/spark/${workflow.sessionId}/${meta.id}"
+            [meta, it[1]]
+        }.set { padding_acquisitions2 }
+
+
+        STITCHING_PREPARE3(
+            padding_acquisitions2
+        )
+
+        SPARK_START3(
+            STITCHING_PREPARE3.out, 
+            [indir, outdir], //directories to mount
+            params.spark_cluster,
+            params.spark_workers as int,
+            params.spark_worker_cores as int,
+            params.spark_gb_per_core as int,
+            params.spark_driver_cores as int,
+            params.spark_driver_memory
+        )
+
+        SPARK_DOWNSAMPLE(SPARK_START3.out)
+
+        done = SPARK_STOP3(SPARK_DOWNSAMPLE.out.acquisitions)
+
+        param5 = SPARK_DOWNSAMPLE.out.acquisitions.map{ tuple("${it[0].ds_outxml}", "${outdir}/easi") }
+
+        fix_res(param5, SPARK_STOP3.out.collect())
 
         tmpdir_ch = Channel.fromPath(tmpdir)
         remove_dir(tmpdir_ch, fix_res.out.control_1.collect())

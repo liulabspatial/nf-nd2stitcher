@@ -172,7 +172,7 @@ export PATH="/groups/scicompsoft/scicompsoft/kawaset_temp:$PATH"
 export NXF_JAVA_HOME="/groups/scicompsoft/scicompsoft/kawaset_temp/tools/jdk-17" 
 cd /groups/scicompsoft/scicompsoft/kawaset_temp/nd2n5
 
-nextflow run ./nd2n5/nd2n5.nf -profile lsf $RESUME --runtime_opts "--env TMPDIR=$NXFTMPDIR -B $INPUTDIR -B /scratch" --inputPath "$INPUTND2" --outputPath "$OUTDIR" $PRESTITCH $FUSIONONLY $ONETILEWINS $THREADNUM $WORKERNUM $CORENUM
+nextflow run ./nd2n5/nd2n5.nf -profile lsf $RESUME --runtime_opts "--env TMPDIR=$NXFTMPDIR -B $INPUTDIR -B /scratch" --dapi_channel \"$DAPI\" --inputPath "$INPUTND2" --outputPath "$OUTDIR" $PRESTITCH $FUSIONONLY $ONETILEWINS $THREADNUM $WORKERNUM $CORENUM
 
 SEARCH_DIR="$OUTDIR/easi"
 NUM_TIMEPOINTS=$(($(find "$SEARCH_DIR" -maxdepth 1 -type d | wc -l) - 1))
@@ -237,12 +237,12 @@ for (( i=0; i<NUM_TIMEPOINTS; i++ )); do
 	if [ $i == 0 ]; then
     	SKIP="stitching,spot_extraction,warp_spots,measure_intensities,assign_spots"
 		RSFISH_CLUSTER_SETTINGS="$RSWORKERNUM $RSCORENUM --rsfish_gb_per_core 15"
-		#eval "nextflow run ./main.nf $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
+		eval "nextflow run ./main.nf $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
 	else
     	#SKIP="stitching,segmentation"
 		SKIP="stitching,spot_extraction,segmentation,warp_spots,measure_intensities,assign_spots"
 		RSFISH_CLUSTER_SETTINGS="$RSWORKERNUM $RSCORENUM --rsfish_gb_per_core 15"
-		#bsub -n 1 -W 24:00 -o $OUTDIR/mulifish_log_t$i.txt -P scicompsoft "./main.nf -c $MULTIFISHDIR/nextflow_no_nv.config $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
+		bsub -n 1 -W 24:00 -o $OUTDIR/mulifish_log_t$i.txt -P scicompsoft "./main.nf -c $MULTIFISHDIR/nextflow_no_nv.config $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
 		#eval "nextflow run ./main.nf -c $MULTIFISHDIR/nextflow_no_nv.config $COMMON_PARAMS --skip \"$SKIP\" $RSFISH_CLUSTER_SETTINGS"
 	fi
 	

@@ -50,7 +50,7 @@ def nd2tiffcsv():
         if 'C' in nd2file.sizes:
             channels = nd2file.sizes['C']
 
-    if tiles_idx < 0:
+    if tiles <= 1:
         print("single tile")
         testfile_path = os.path.join(os.path.dirname(output), "SingleTile")
         with open(testfile_path, 'w') as testfile:
