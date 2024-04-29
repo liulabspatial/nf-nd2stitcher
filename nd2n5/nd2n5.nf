@@ -260,7 +260,7 @@ process SPARK_RESAVE {
     scratch true
 
     tag "${meta.id}"
-    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.3'
+    container 'ghcr.io/liulabspatial/bigstitcher-spark:0.0.3'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
@@ -307,7 +307,7 @@ process SPARK_RESAVE_WITH_DOWNSAMPLE {
     scratch true
 
     tag "${meta.id}"
-    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.3'
+    container 'ghcr.io/liulabspatial/bigstitcher-spark:0.0.3'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
@@ -354,7 +354,7 @@ process SPARK_DOWNSAMPLE {
     scratch true
 
     tag "${meta.id}"
-    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.6'
+    container 'ghcr.io/liulabspatial/bigstitcher-spark:0.0.6'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
@@ -394,7 +394,7 @@ process SPARK_FUSION {
     scratch true
 
     tag "${meta.id}"
-    container 'registry.int.janelia.org/liulab/bigstitcher-spark:0.0.6'
+    container 'ghcr.io/liulabspatial/bigstitcher-spark:0.0.6'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
     cpus { spark.driver_cores }
     memory { spark.driver_memory }
