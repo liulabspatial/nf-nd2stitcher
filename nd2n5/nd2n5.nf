@@ -303,7 +303,7 @@ process SPARK_RESAVE {
     """
 }
 
-process SPARK_RESAVE_WITH_DOWNSAMPLE {
+process SPARK_RESAVE_SINGLE {
     scratch true
 
     tag "${meta.id}"
@@ -578,10 +578,10 @@ workflow {
         SPARK_RESAVE(sp_start_branching.multi)
         done = SPARK_STOP(SPARK_RESAVE.out.acquisitions)
 
-        SPARK_RESAVE_WITH_DOWNSAMPLE(sp_start_branching.single)
-        done_single = SPARK_STOP_SINGLE(SPARK_RESAVE_WITH_DOWNSAMPLE.out.acquisitions)
+        SPARK_RESAVE_SINGLE(sp_start_branching.single)
+        done_single = SPARK_STOP_SINGLE(SPARK_RESAVE_SINGLE.out.acquisitions)
 
-        padding_single(SPARK_RESAVE_WITH_DOWNSAMPLE.out.acquisitions, SPARK_STOP_SINGLE.out.collect())
+        padding_single(SPARK_RESAVE_SINGLE.out.acquisitions, SPARK_STOP_SINGLE.out.collect())
 
         param_single = padding_single.out.acquisitions.map{ tuple("${it[0].resave_outxml}", "${outdir}/easi", "${it[0].resave_outxml}") }
         fix_res_single(param_single, SPARK_STOP_SINGLE.out.collect())
