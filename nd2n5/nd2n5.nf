@@ -37,6 +37,8 @@ params.spark_cluster = true
 params.spark_workers = 4
 params.spark_worker_cores = 16
 params.spark_gb_per_core = 14
+params.spark_worker_cores_for_fusion = 16
+params.spark_gb_per_core_for_fusion = 14
 params.spark_driver_cores = 1
 params.spark_driver_memory = '12 GB'
 
@@ -61,7 +63,7 @@ include { remove_dir as remove_dir_single} from './reusables'
 process define_dataset {
     scratch true
 
-    container 'ghcr.io/janeliascicomp/nd2-to-n5-fiji:0.0.2'
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-fiji:0.0.4'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "4 GB" }
@@ -103,7 +105,7 @@ process fix_n5xml {
 process calc_stitching_resume {
     scratch true
 
-    container 'ghcr.io/janeliascicomp/nd2-to-n5-fiji:0.0.2'
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-fiji:0.0.4'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "${params.mem_gb} GB" }
@@ -124,7 +126,7 @@ process calc_stitching_resume {
 process calc_stitching {
     scratch true
 
-    container 'ghcr.io/janeliascicomp/nd2-to-n5-fiji:0.0.2'
+    container 'ghcr.io/janeliascicomp/nd2-to-n5-fiji:0.0.4'
     containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
 
     memory { "${params.mem_gb} GB" }
@@ -648,8 +650,8 @@ workflow {
             [indir, outdir], //directories to mount
             params.spark_cluster,
             params.spark_workers as int,
-            params.spark_worker_cores as int,
-            params.spark_gb_per_core as int,
+            params.spark_worker_cores_for_fusion as int,
+            params.spark_gb_per_core_for_fusion as int,
             params.spark_driver_cores as int,
             params.spark_driver_memory
         )
