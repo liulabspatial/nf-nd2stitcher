@@ -705,7 +705,7 @@ workflow {
 
         SPARK_MASK(SPARK_START2.out)
 
-        SPARK_FUSION(SPARK_MASK.out)
+        SPARK_FUSION(SPARK_MASK.out.acquisitions)
 
         done = SPARK_STOP2(SPARK_FUSION.out.acquisitions)
 
