@@ -46,10 +46,20 @@ RUN mv /tmp/app/target/`cat filename` app.jar
 RUN echo "$BIGSTITCHER_SPARK_GIT_TAG" > /tmp/app/VERSION
 
 # Create final image
-FROM multifish/biocontainers-spark:${SPARK_VERSION}
+FROM multifish/spark:3.0.1-hadoop3.2
 ARG BIGSTITCHER_SPARK_GIT_TAG
 
-RUN apt-get update && apt install -y procps g++ libblosc1 libblosc-dev && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* 
+# RUN apt-get update && apt install -y procps g++ libblosc1 libblosc-dev && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* 
+RUN yum update -y && yum install -y procps gcc-c++ cmake git && yum clean all && rm -rf /tmp/* /var/tmp/* 
+
+WORKDIR /tmp/lib
+
+RUN git clone --branch main --depth 1 https://github.com/Blosc/c-blosc.git
+WORKDIR /tmp/lib/c-blosc/build
+RUN cmake -S /tmp/lib/c-blosc -B /tmp/lib/c-blosc/build \
+    && make \
+    && make install
+
 
 LABEL software="bigstitcher-spark" \
     base_image="apache/spark" \
