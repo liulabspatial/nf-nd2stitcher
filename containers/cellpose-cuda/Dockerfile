@@ -26,7 +26,7 @@ RUN conda config --set always_yes yes --set changeps1 no && \
     conda update -q conda
 
 RUN conda install -n base -c conda-forge python=3.10.12 tqdm numpy=1.24.3 scikit-image=0.22.0 \
-        zarr=2.13.3 dask=2023.11.0 dask-image tifffile nd2 -y \
+        zarr=2.13.3 dask=2023.11.0 dask-image tifffile nd2 z5py -y \
     && conda run -n base pip install gputools xarray-multiscale fibsem-tools cellpose==2.2.3 \
     && conda clean --tarballs -y \
     && mkdir -p /opt/conda/envs/myenv/etc/conda/activate.d \

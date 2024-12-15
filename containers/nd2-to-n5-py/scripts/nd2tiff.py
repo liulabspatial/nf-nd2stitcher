@@ -38,6 +38,7 @@ def nd2tiff():
     parser.add_argument("-i", "--input", dest="input", type=str, default=None, help="input files")
     parser.add_argument("-o", "--output", dest="output", type=str, default=None, help="output file path (.xml)")
     parser.add_argument("-b", "--bg", dest="bg", type=str, default=None, help="background file path (.xml)")
+    parser.add_argument("-c", "--crop", dest="crop", type=str, default="0,0,0,0", help="cropping percentage (top,bottom,left,right)")
     parser.add_argument("--verbose", dest="verbose", default=False, action="store_true", help="enable verbose logging")
 
     if not argv:
@@ -50,6 +51,7 @@ def nd2tiff():
     outpath = args.output
     outdir = os.path.dirname(outpath)
     bg = args.bg
+    crop_percentages = [float(num) if '.' in num else int(num) for num in args.crop.split(',')]
 
     numbers = re.findall(r'\d+', outpath)
     time_id = int(numbers[len(numbers)-1])
@@ -99,30 +101,40 @@ def nd2tiff():
     h = darray.shape[y_idx]
     w = darray.shape[x_idx]
 
+    st_x = int(crop_percentages[2] * 0.01 * w + 0.5)
+    ed_x = int( (1.0 - crop_percentages[3] * 0.01) * w + 0.5)
+    st_y = int(crop_percentages[0] * 0.01 * h + 0.5)
+    ed_y = int( (1.0 - crop_percentages[1] * 0.01) * h + 0.5)
+
+    w = ed_x - st_x
+    h = ed_y - st_y
+
     output = np.zeros((d, h, w), dtype=darray.dtype)
     if timepoints_idx >= 0:
         if tiles_idx >= 0:
             if channels_idx >= 0:
-                output[:d, :h, :w] = darray[time_id, tile_id, :d, ch_id, :h, :w]
+                output[:d, :h, :w] = darray[time_id, tile_id, :d, ch_id, st_y:ed_y, st_x:ed_x]
             else:
-                output[:d, :h, :w] = darray[time_id, tile_id, :d, :h, :w]
+                output[:d, :h, :w] = darray[time_id, tile_id, :d, st_y:ed_y, st_x:ed_x]
         else:
             if channels_idx >= 0:
-                output[:d, :h, :w] = darray[time_id, :d, ch_id, :h, :w]
+                output[:d, :h, :w] = darray[time_id, :d, ch_id, st_y:ed_y, st_x:ed_x]
             else:
-                output[:d, :h, :w] = darray[time_id, :d, :h, :w]
+                output[:d, :h, :w] = darray[time_id, :d, st_y:ed_y, st_x:ed_x]
     else:
         if tiles_idx >= 0:
             if channels_idx >= 0:
-                output[:d, :h, :w] = darray[tile_id, :d, ch_id, :h, :w]
+                output[:d, :h, :w] = darray[tile_id, :d, ch_id, st_y:ed_y, st_x:ed_x]
             else:
-                output[:d, :h, :w] = darray[tile_id, :d, :h, :w]
+                output[:d, :h, :w] = darray[tile_id, :d, st_y:ed_y, st_x:ed_x]
         else:
             if channels_idx >= 0:
-                output[:d, :h, :w] = darray[:d, ch_id, :h, :w]
+                output[:d, :h, :w] = darray[:d, ch_id, st_y:ed_y, st_x:ed_x]
             else:
-                output[:d, :h, :w] = darray[:d, :h, :w]
+                output[:d, :h, :w] = darray[:d, st_y:ed_y, st_x:ed_x]
 
+    print(output.shape)
+    
     tifffile.imsave(outpath, output, compression=("ZLIB", 6))
 
 def main():

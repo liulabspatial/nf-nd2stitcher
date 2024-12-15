@@ -10,6 +10,8 @@ usage() {
     echo "  -t, --thread    	number of threads for non-spark processes"
     echo "  -w, --worker    	number of workers for spark processes"
     echo "  -c, --core    	    number of cores per worker for spark processes"
+	echo "  -c2, --core2    	number of cores per worker for spark fusion processes"
+	echo "  -x, --crop    	    cropping percentage (top, bottom, left, right)"
     echo "  -p, --prestitch	    do not perform image fusion"
     echo "  -f, --fusionOnly	perform only image fusion"
 	echo "  --oneTileWins		use the one-tile-wins strategy for stitching"
@@ -19,7 +21,6 @@ usage() {
 }
 
 DAPI=0
-MODEL="/nrs/scicompsoft/kawaset/Liu/ESCell60X"
 MINSEGSIZE=1200
 DIAMETER=40
 
@@ -82,6 +83,22 @@ do
 			RSCORENUM="--rsfish_worker_cores $2"
 			shift 2
 			;;
+		'-c2'|'--core2' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
+				echo "$PROGNAME: option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			CORENUM2="--spark_worker_cores_for_fusion $2"
+			shift 2
+			;;
+		'-x'|'--crop' )
+			if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
+				echo "$PROGNAME: option requires an argument -- $1" 1>&2
+				exit 1
+			fi
+			CROP="--crop $2"
+			shift 2
+			;;
 		'-p'|'--prestitch' )
 			PRESTITCH="--prestitch"
 			shift 1
@@ -121,7 +138,7 @@ INPUTDIR=$(dirname "$INPUTND2")
 
 RAND=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 13;)
 
-NXFTMPDIR="/scratch/$USER/$RAND/nextflow_temp"
+NXFTMPDIR="/tmp/$USER/$RAND/nextflow_temp"
 if [ ! -d "$NXFTMPDIR" ]; then
     mkdir -p "$NXFTMPDIR"
     echo "Directory created: $NXFTMPDIR"
@@ -129,10 +146,21 @@ else
     echo "Directory already exists: $NXFTMPDIR"
 fi
 
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p "$OUTDIR"
+    echo "Directory created: $OUTDIR"
+else
+    echo "Directory already exists: $OUTDIR"
+fi
+
+BASEDIR=$(dirname "$0")
+
 export TMPDIR="$NXFTMPDIR"
 export NXF_TEMP="$NXFTMPDIR"
-export PATH="/groups/scicompsoft/scicompsoft/kawaset_temp:$PATH"
-export NXF_JAVA_HOME="/groups/scicompsoft/scicompsoft/kawaset_temp/tools/jdk-17" 
-cd /groups/scicompsoft/scicompsoft/kawaset_temp/nd2n5
+cd $BASEDIR 
 
-nextflow run ./nd2n5/nd2n5.nf -profile lsf $RESUME --runtime_opts "--env TMPDIR=$NXFTMPDIR -B $INPUTDIR -B /scratch" --dapi_channel \"$DAPI\" --inputPath "$INPUTND2" --outputPath "$OUTDIR" $PRESTITCH $FUSIONONLY $ONETILEWINS $THREADNUM $WORKERNUM $CORENUM
+$BASEDIR/../nextflow run $BASEDIR/nd2n5/nd2n5.nf -c $BASEDIR/nextflow.config -profile standard $RESUME --runtime_opts "--env TMPDIR=$NXFTMPDIR -B $INPUTDIR -B /tmp -B $OUTDIR -B $BASEDIR" --dapi_channel \"$DAPI\" --inputPath "$INPUTND2" --outputPath "$OUTDIR" $PRESTITCH $FUSIONONLY $ONETILEWINS $THREADNUM $WORKERNUM $CORENUM $CORENUM2 $CROP
+
+rm -rf "$BASEDIR/spark"
+rm -rf "$BASEDIR/work"
+rm -rf "$BASEDIR/.nextflow"

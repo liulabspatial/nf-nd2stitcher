@@ -64,7 +64,7 @@ def main():
     for item in xml.findall(".//n5"):
         in_n5path = os.path.join(os.path.dirname(input), item.text)  
     
-    out_n5path = os.path.join(output, "dataset-t" + str(time) + os.path.sep + "stitching" + os.path.sep + "export.n5")
+    out_n5path = output #os.path.join(output, "t" + str(time))
 
     os.makedirs(out_n5path, exist_ok=True)
 

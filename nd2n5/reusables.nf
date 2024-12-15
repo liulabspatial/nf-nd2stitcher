@@ -38,3 +38,26 @@ process remove_dir {
     rm -rf $tar
     """
 }
+
+process create_checkpoint {
+    scratch true
+
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
+
+    memory { "1 GB" }
+    cpus { 1 }
+
+    input:
+    val(tar)
+    val(control_1) 
+
+    output:
+    val "${tar}"
+    
+    script:
+    file = new File("${tar}")
+    file.createNewFile() 
+    """
+    echo creating checkpoint files
+    """
+}
