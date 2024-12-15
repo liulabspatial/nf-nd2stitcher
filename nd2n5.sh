@@ -159,7 +159,7 @@ export TMPDIR="$NXFTMPDIR"
 export NXF_TEMP="$NXFTMPDIR"
 cd $BASEDIR 
 
-$BASEDIR/../nextflow run $BASEDIR/nd2n5/nd2n5.nf -c $BASEDIR/nextflow.config -profile standard $RESUME --runtime_opts "--env TMPDIR=$NXFTMPDIR -B $INPUTDIR -B /tmp -B $OUTDIR -B $BASEDIR" --dapi_channel \"$DAPI\" --inputPath "$INPUTND2" --outputPath "$OUTDIR" $PRESTITCH $FUSIONONLY $ONETILEWINS $THREADNUM $WORKERNUM $CORENUM $CORENUM2 $CROP
+nextflow run $BASEDIR/nd2n5/nd2n5.nf -c $BASEDIR/nextflow.config -profile standard $RESUME --runtime_opts "--env TMPDIR=$NXFTMPDIR -B $INPUTDIR -B /tmp -B $OUTDIR -B $BASEDIR" --dapi_channel \"$DAPI\" --inputPath "$INPUTND2" --outputPath "$OUTDIR" $PRESTITCH $FUSIONONLY $ONETILEWINS $THREADNUM $WORKERNUM $CORENUM $CORENUM2 $CROP
 
 rm -rf "$BASEDIR/spark"
 rm -rf "$BASEDIR/work"
