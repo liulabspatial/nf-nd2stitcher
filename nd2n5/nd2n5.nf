@@ -610,6 +610,52 @@ process SPARK_MASK {
     """ 
 }
 
+process SPARK_MASK {
+    scratch true
+
+    tag "${meta.id}"
+    container 'ghcr.io/janeliascicomp/bigstitcher-spark:0.0.7'
+    containerOptions { getOptions([getParent(params.inputPath), params.outputPath]) }
+    cpus { spark.driver_cores }
+    memory { spark.driver_memory }
+
+    input:
+    tuple val(meta), path(xml), val(spark) 
+
+    output:
+    tuple val(meta), path(xml), val(spark), emit: acquisitions
+    path "versions.yml", emit: versions
+
+    when:
+    task.ext.when == null || task.ext.when
+
+    script:
+    extra_args = task.ext.args ?: ''
+    executor_memory = spark.executor_memory.replace(" KB",'k').replace(" MB",'m').replace(" GB",'g').replace(" TB",'t')
+    driver_memory = spark.driver_memory.replace(" KB",'k').replace(" MB",'m').replace(" GB",'g').replace(" TB",'t')
+    inxml = meta.fusion_inxml
+    outxml = meta.mask_outxml
+    n5dir = meta.fusion_n5dir
+    oneTileWins = params.oneTileWins ? '--oneTileWins' : ''
+
+    parsed_xml = new XmlSlurper().parse("$inxml")
+    maxChannelId = parsed_xml.'**'.findAll{ it.name() == 'Channel' }.size() - 1
+
+    """
+    for i in {0..$maxChannelId}; do
+        /opt/scripts/runapp.sh "$workflow.containerEngine" "$spark.work_dir" "$spark.uri" \
+            /app/app.jar net.preibisch.bigstitcher.spark.AffineFusion \
+            $spark.parallelism $spark.worker_cores "$executor_memory" $spark.driver_cores "$driver_memory" \
+            --bdv 0,\$i --channelId \$i -x ${inxml} -xo ${outxml} -o ${n5dir} --blockSize ${params.blockSize} ${oneTileWins} --mask --UINT16 --minIntensity 0.0 --maxIntensity 65535.0 --downsampling "1,1,1;2,2,2;4,4,4"
+    done
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        spark: \$(cat /opt/spark/VERSION)
+        stitching-spark: \$(cat /app/VERSION)
+    END_VERSIONS
+    """
+}
+
 process fix_res {
     scratch true
 
